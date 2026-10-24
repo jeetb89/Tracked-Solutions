@@ -1,1 +1,30 @@
+# Local environment and secrets. Keep the checked-in template.
 .env
+.env.*
+!.env.example
+
+# Java / Maven build output
+target/
+**/target/
+build/
+out/
+
+# IDE metadata
+.idea/
+*.iml
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and local database files
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# Local Spring configuration overrides
+**/application-local.properties
+**/application-local.yml
+**/application-local.yaml

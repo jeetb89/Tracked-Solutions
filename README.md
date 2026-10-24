@@ -3,20 +3,23 @@
 This repository is my workspace for two areas of ongoing development:
 
 - **Daily coding solutions** — a place to track the problems I solve, keep readable implementations, and record useful approaches as I practice.
-- **Backend development** — a place to build and document backend projects, including their APIs, data stores, and local development setup.
+- **Backend development** — a place to build and document backend projects, including an order management service and its local development setup.
 
 The goal is to keep my problem-solving work consistent and make my backend projects easy to run and understand.
 
 ## Repository contents
 
 ```text
-Solutions/       Daily coding problem solutions
-compose.yaml     Local PostgreSQL, MySQL, and Redis services
-.env.example    Example local service configuration
-Brewfile         macOS development tools
+Solutions/                Daily coding problem solutions
+order-management-service/  Spring Boot order management service
+compose.yaml               Local PostgreSQL, MySQL, and Redis services
+.env.example               Example local service configuration
+Brewfile                   macOS development tools
 ```
 
 As the repository grows, each solution and backend project will include the context needed to understand or run it.
+
+The order management service currently uses an in-memory H2 database. See [order-management-service/README.md](order-management-service/README.md) for setup and API examples.
 
 ## Local development environment (macOS)
 
