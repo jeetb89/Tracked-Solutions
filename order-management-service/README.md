@@ -6,6 +6,7 @@ A Spring Boot REST API for creating, listing, updating, and deleting customer or
 
 - Java 17 or newer
 - Maven 3.6.3 or newer
+- Redis 7 or newer (available through the repository's Docker Compose setup)
 
 ## Run
 
@@ -14,6 +15,8 @@ From this directory:
 ```sh
 mvn spring-boot:run
 ```
+
+Start Redis first from the repository root with `docker compose up -d redis`. The service uses Redis as a cache for order lookups by ID and order number, with a 10-minute TTL. Creates, updates, and deletes clear both order lookup caches. PostgreSQL remains the source of truth.
 
 The API listens at `http://localhost:8080`. The H2 console is available at `http://localhost:8080/h2-console` with JDBC URL `jdbc:h2:mem:orders`, username `sa`, and a blank password.
 

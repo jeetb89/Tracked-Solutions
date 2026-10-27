@@ -1,8 +1,11 @@
 package com.example.ordermanagement.order.dto;
 
 import java.math.BigDecimal;
+import java.io.Serializable;
 
-public class OrderItemResponse {
+public class OrderItemResponse implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private String productCode;
     private BigDecimal unitPrice;

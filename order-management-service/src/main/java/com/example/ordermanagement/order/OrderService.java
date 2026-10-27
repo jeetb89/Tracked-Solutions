@@ -1,6 +1,8 @@
 package com.example.ordermanagement.order;
 
 import org.springframework.data.domain.Sort;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.example.ordermanagement.order.dto.CreateOrderRequest;
@@ -35,11 +37,13 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "ordersById", key = "#id")
     public OrderResponse getOrderById(Long id) {
         return OrderResponse.from(findEntityById(id));
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "ordersByNumber", key = "#orderNumber")
     public OrderResponse getOrderByNumber(String orderNumber) {
         Order order = repository.findByOrderNumber(orderNumber)
                 .orElseThrow(() -> new OrderNotFoundException(orderNumber));
@@ -47,6 +51,7 @@ public class OrderService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = {"ordersById", "ordersByNumber"}, allEntries = true)
     public OrderResponse createOrder(CreateOrderRequest request) {
         Order order = new Order();
         applyRequest(order, request);
@@ -54,12 +59,14 @@ public class OrderService {
         return OrderResponse.from(repository.save(order));
     }
 
+    @CacheEvict(cacheNames = {"ordersById", "ordersByNumber"}, allEntries = true)
     public OrderResponse update(Long id, CreateOrderRequest request) {
         Order order = findEntityById(id);
         applyRequest(order, request);
         return OrderResponse.from(repository.save(order));
     }
 
+    @CacheEvict(cacheNames = {"ordersById", "ordersByNumber"}, allEntries = true)
     public OrderResponse updateByNumber(String orderNumber, CreateOrderRequest request) {
         Order order = findEntityByNumber(orderNumber);
         applyRequest(order, request);
@@ -88,10 +95,12 @@ public class OrderService {
         return item;
     }
 
+    @CacheEvict(cacheNames = {"ordersById", "ordersByNumber"}, allEntries = true)
     public void delete(Long id) {
         repository.delete(findEntityById(id));
     }
 
+    @CacheEvict(cacheNames = {"ordersById", "ordersByNumber"}, allEntries = true)
     public void deleteByNumber(String orderNumber) {
         repository.delete(findEntityByNumber(orderNumber));
     }

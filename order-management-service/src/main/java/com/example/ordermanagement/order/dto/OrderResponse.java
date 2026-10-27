@@ -4,10 +4,13 @@ import com.example.ordermanagement.order.Order;
 import com.example.ordermanagement.order.OrderStatus;
 
 import java.math.BigDecimal;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public class OrderResponse {
+public class OrderResponse implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private String orderNumber;
     private String customerEmail;
