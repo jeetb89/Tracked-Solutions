@@ -21,6 +21,14 @@ As the repository grows, each solution and backend project will include the cont
 
 The order management service currently uses an in-memory H2 database. See [order-management-service/README.md](order-management-service/README.md) for setup and API examples.
 
+To start the order management service with its PostgreSQL and Redis dependencies, run this from the repository root:
+
+```sh
+./run-order-service.sh
+```
+
+The script starts the Compose services, waits for their health checks, and launches the API on `http://localhost:8080`. Stop the API with `Ctrl+C`; stop the containers with `docker compose down`.
+
 ## Local development environment (macOS)
 
 This repository includes a repeatable setup for macOS. It installs a JDK, VS Code, Docker Desktop, and Postman with Homebrew, and runs PostgreSQL, MySQL, and Redis in Docker. Java 17 matches the `spring-petclinic-microservices` project in the workspace.
