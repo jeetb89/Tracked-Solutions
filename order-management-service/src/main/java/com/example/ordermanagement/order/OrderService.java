@@ -3,23 +3,41 @@ package com.example.ordermanagement.order;
 import org.springframework.data.domain.Sort;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.annotation.Transactional;
 import com.example.ordermanagement.order.dto.CreateOrderRequest;
 import com.example.ordermanagement.order.dto.OrderItemRequest;
 import com.example.ordermanagement.order.dto.OrderResponse;
 
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
+import java.time.Duration;
 
 @Service
 @Transactional
 public class OrderService {
 
-    private final OrderRepository repository;
+    private static final String CUSTOMER_ORDERS_CACHE_PREFIX = "orders:customer:";
 
-    public OrderService(OrderRepository repository) {
+    private final OrderRepository repository;
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final Duration customerOrdersCacheTtl;
+
+    public OrderService(
+            OrderRepository repository,
+            RedisTemplate<String, Object> redisTemplate,
+            @Value("${spring.cache.redis.time-to-live:10m}") Duration customerOrdersCacheTtl) {
         this.repository = repository;
+        this.redisTemplate = redisTemplate;
+        this.customerOrdersCacheTtl = customerOrdersCacheTtl;
     }
 
     @Transactional(readOnly = true)
@@ -31,9 +49,19 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<OrderResponse> getOrdersByCustomerEmail(String email) {
-        return repository.findByCustomerEmailOrderByCreatedAtDesc(email).stream()
+        String cacheKey = customerOrdersCacheKey(email);
+        Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
+        if (cachedValue instanceof List<?> cachedOrders) {
+            return cachedOrders.stream()
+                    .map(OrderResponse.class::cast)
+                    .toList();
+        }
+
+        List<OrderResponse> orders = repository.findByCustomerEmailOrderByCreatedAtDesc(email).stream()
                 .map(OrderResponse::from)
                 .toList();
+        redisTemplate.opsForValue().set(cacheKey, new ArrayList<>(orders), customerOrdersCacheTtl);
+        return orders;
     }
 
     @Transactional(readOnly = true)
@@ -56,21 +84,29 @@ public class OrderService {
         Order order = new Order();
         applyRequest(order, request);
         order.setOrderNumber(UUID.randomUUID().toString());
-        return OrderResponse.from(repository.save(order));
+        Order savedOrder = repository.save(order);
+        evictCustomerOrdersAfterCommit(request.getCustomerEmail());
+        return OrderResponse.from(savedOrder);
     }
 
     @CacheEvict(cacheNames = {"ordersById", "ordersByNumber"}, allEntries = true)
     public OrderResponse update(Long id, CreateOrderRequest request) {
         Order order = findEntityById(id);
+        String previousEmail = order.getCustomerEmail();
         applyRequest(order, request);
-        return OrderResponse.from(repository.save(order));
+        Order savedOrder = repository.save(order);
+        evictCustomerOrdersAfterCommit(previousEmail, savedOrder.getCustomerEmail());
+        return OrderResponse.from(savedOrder);
     }
 
     @CacheEvict(cacheNames = {"ordersById", "ordersByNumber"}, allEntries = true)
     public OrderResponse updateByNumber(String orderNumber, CreateOrderRequest request) {
         Order order = findEntityByNumber(orderNumber);
+        String previousEmail = order.getCustomerEmail();
         applyRequest(order, request);
-        return OrderResponse.from(repository.save(order));
+        Order savedOrder = repository.save(order);
+        evictCustomerOrdersAfterCommit(previousEmail, savedOrder.getCustomerEmail());
+        return OrderResponse.from(savedOrder);
     }
 
     private void applyRequest(Order order, CreateOrderRequest request) {
@@ -97,12 +133,16 @@ public class OrderService {
 
     @CacheEvict(cacheNames = {"ordersById", "ordersByNumber"}, allEntries = true)
     public void delete(Long id) {
-        repository.delete(findEntityById(id));
+        Order order = findEntityById(id);
+        evictCustomerOrdersAfterCommit(order.getCustomerEmail());
+        repository.delete(order);
     }
 
     @CacheEvict(cacheNames = {"ordersById", "ordersByNumber"}, allEntries = true)
     public void deleteByNumber(String orderNumber) {
-        repository.delete(findEntityByNumber(orderNumber));
+        Order order = findEntityByNumber(orderNumber);
+        evictCustomerOrdersAfterCommit(order.getCustomerEmail());
+        repository.delete(order);
     }
 
     private Order findEntityById(Long id) {
@@ -112,5 +152,31 @@ public class OrderService {
     private Order findEntityByNumber(String orderNumber) {
         return repository.findByOrderNumber(orderNumber)
                 .orElseThrow(() -> new OrderNotFoundException(orderNumber));
+    }
+
+    private String customerOrdersCacheKey(String email) {
+        return CUSTOMER_ORDERS_CACHE_PREFIX + email;
+    }
+
+    private void evictCustomerOrdersAfterCommit(String... emails) {
+        Set<String> cacheKeys = Arrays.stream(emails)
+                .filter(email -> email != null && !email.isBlank())
+                .map(this::customerOrdersCacheKey)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (cacheKeys.isEmpty()) {
+            return;
+        }
+
+        Runnable eviction = () -> redisTemplate.delete(cacheKeys);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    eviction.run();
+                }
+            });
+        } else {
+            eviction.run();
+        }
     }
 }

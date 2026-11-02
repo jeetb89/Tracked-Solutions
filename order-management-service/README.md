@@ -20,6 +20,12 @@ Start Redis first from the repository root with `docker compose up -d redis`. Th
 
 The API listens at `http://localhost:8080`. The H2 console is available at `http://localhost:8080/h2-console` with JDBC URL `jdbc:h2:mem:orders`, username `sa`, and a blank password.
 
+## Redis caching
+
+Redis is used as a shared cache across service instances. The service uses Spring Cache annotations (`@Cacheable` and `@CacheEvict`) for individual order lookups by database ID and order number. Customer-email order lists use `RedisTemplate` directly with keys under `orders:customer:` and the same TTL configured by `spring.cache.redis.time-to-live` (10 minutes by default).
+
+Create, update, and delete operations evict the affected customer-list keys after the database transaction commits. They also clear the annotated order lookup caches. The `RedisTemplate` uses string keys and Java serialization for cached response values; the response DTOs are serializable.
+
 ## Endpoints
 
 | Method | Path | Action |
