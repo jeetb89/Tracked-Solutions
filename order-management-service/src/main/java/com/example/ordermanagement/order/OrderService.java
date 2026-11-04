@@ -28,14 +28,17 @@ public class OrderService {
     private static final String CUSTOMER_ORDERS_CACHE_PREFIX = "orders:customer:";
 
     private final OrderRepository repository;
+    private final OrderEventRecorder eventRecorder;
     private final RedisTemplate<String, Object> redisTemplate;
     private final Duration customerOrdersCacheTtl;
 
     public OrderService(
             OrderRepository repository,
+            OrderEventRecorder eventRecorder,
             RedisTemplate<String, Object> redisTemplate,
             @Value("${spring.cache.redis.time-to-live:10m}") Duration customerOrdersCacheTtl) {
         this.repository = repository;
+        this.eventRecorder = eventRecorder;
         this.redisTemplate = redisTemplate;
         this.customerOrdersCacheTtl = customerOrdersCacheTtl;
     }
@@ -85,6 +88,7 @@ public class OrderService {
         applyRequest(order, request);
         order.setOrderNumber(UUID.randomUUID().toString());
         Order savedOrder = repository.save(order);
+        eventRecorder.recordCreated(savedOrder.getOrderNumber());
         evictCustomerOrdersAfterCommit(request.getCustomerEmail());
         return OrderResponse.from(savedOrder);
     }
@@ -95,6 +99,7 @@ public class OrderService {
         String previousEmail = order.getCustomerEmail();
         applyRequest(order, request);
         Order savedOrder = repository.save(order);
+        eventRecorder.recordUpdated(savedOrder.getOrderNumber());
         evictCustomerOrdersAfterCommit(previousEmail, savedOrder.getCustomerEmail());
         return OrderResponse.from(savedOrder);
     }
@@ -105,6 +110,7 @@ public class OrderService {
         String previousEmail = order.getCustomerEmail();
         applyRequest(order, request);
         Order savedOrder = repository.save(order);
+        eventRecorder.recordUpdated(savedOrder.getOrderNumber());
         evictCustomerOrdersAfterCommit(previousEmail, savedOrder.getCustomerEmail());
         return OrderResponse.from(savedOrder);
     }
@@ -136,6 +142,7 @@ public class OrderService {
         Order order = findEntityById(id);
         evictCustomerOrdersAfterCommit(order.getCustomerEmail());
         repository.delete(order);
+        eventRecorder.recordDeleted(order.getOrderNumber());
     }
 
     @CacheEvict(cacheNames = {"ordersById", "ordersByNumber"}, allEntries = true)
@@ -143,6 +150,7 @@ public class OrderService {
         Order order = findEntityByNumber(orderNumber);
         evictCustomerOrdersAfterCommit(order.getCustomerEmail());
         repository.delete(order);
+        eventRecorder.recordDeleted(order.getOrderNumber());
     }
 
     private Order findEntityById(Long id) {

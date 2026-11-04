@@ -12,16 +12,16 @@ The goal is to keep my problem-solving work consistent and make my backend proje
 ```text
 Solutions/                Daily coding problem solutions
 order-management-service/  Spring Boot order management service
-compose.yaml               Local PostgreSQL, MySQL, and Redis services
+compose.yaml               Local PostgreSQL, MySQL, Redis, and Kafka services
 .env.example               Example local service configuration
 Brewfile                   macOS development tools
 ```
 
 As the repository grows, each solution and backend project will include the context needed to understand or run it.
 
-The order management service currently uses an in-memory H2 database. See [order-management-service/README.md](order-management-service/README.md) for setup and API examples.
+The order management service uses PostgreSQL for orders, Redis for caching, and Kafka for order events. See [order-management-service/README.md](order-management-service/README.md) for setup and API examples.
 
-To start the order management service with its PostgreSQL and Redis dependencies, run this from the repository root:
+To start the order management service with its PostgreSQL, Redis, and Kafka dependencies, run this from the repository root:
 
 ```sh
 ./run-order-service.sh
@@ -66,6 +66,7 @@ Connection details with the default `.env` values:
 | PostgreSQL | `localhost:5432` | `app` | `app` | `localdev` |
 | MySQL | `localhost:3306` | `app` | `app` | `localdev` |
 | Redis | `localhost:6379` | — | — | — |
+| Kafka | `localhost:9092` | — | — | — |
 
 PostgreSQL and MySQL are alternatives for most applications; both are available so each project can use the database that fits. These credentials are for local development only. Change the host ports in `.env` if they are already in use.
 

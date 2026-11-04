@@ -48,7 +48,8 @@ public class OrderController {
 
     @PutMapping("/{orderNumber}")
     public OrderResponse update(@PathVariable String orderNumber, @Valid @RequestBody CreateOrderRequest request) {
-        return service.updateByNumber(orderNumber, request);
+        OrderResponse response = service.updateByNumber(orderNumber, request);
+        return response;
     }
 
     @DeleteMapping("/{orderNumber}")

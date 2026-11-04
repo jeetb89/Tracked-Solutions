@@ -1,12 +1,14 @@
 # Order Management Service
 
-A Spring Boot REST API for creating, listing, updating, and deleting customer orders. It uses Spring Data JPA and an in-memory H2 database; data resets when the application stops.
+A Spring Boot REST API for creating, listing, updating, and deleting customer orders. It uses Spring Data JPA with PostgreSQL, Redis caching, and Kafka order events.
 
 ## Requirements
 
 - Java 17 or newer
 - Maven 3.6.3 or newer
+- PostgreSQL 16 or newer (available through the repository's Docker Compose setup)
 - Redis 7 or newer (available through the repository's Docker Compose setup)
+- Apache Kafka 4.1 or newer (available through the repository's Docker Compose setup)
 
 ## Run
 
@@ -16,15 +18,21 @@ From this directory:
 mvn spring-boot:run
 ```
 
-Start Redis first from the repository root with `docker compose up -d redis`. The service uses Redis as a cache for order lookups by ID and order number, with a 10-minute TTL. Creates, updates, and deletes clear both order lookup caches. PostgreSQL remains the source of truth.
+Start PostgreSQL, Redis, and Kafka from the repository root with `docker compose up -d postgres redis kafka`. The service uses Redis as a cache for order lookups, with a 10-minute TTL. PostgreSQL remains the source of truth.
 
-The API listens at `http://localhost:8080`. The H2 console is available at `http://localhost:8080/h2-console` with JDBC URL `jdbc:h2:mem:orders`, username `sa`, and a blank password.
+The API listens at `http://localhost:8080`. PostgreSQL connection settings can be supplied with `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD`; defaults match the repository's Compose configuration.
 
 ## Redis caching
 
 Redis is used as a shared cache across service instances. The service uses Spring Cache annotations (`@Cacheable` and `@CacheEvict`) for individual order lookups by database ID and order number. Customer-email order lists use `RedisTemplate` directly with keys under `orders:customer:` and the same TTL configured by `spring.cache.redis.time-to-live` (10 minutes by default).
 
 Create, update, and delete operations evict the affected customer-list keys after the database transaction commits. They also clear the annotated order lookup caches. The `RedisTemplate` uses string keys and Java serialization for cached response values; the response DTOs are serializable.
+
+## Kafka order events
+
+The service writes an outbox row in the same database transaction as each order create, update, and delete. A scheduled publisher sends pending rows as JSON events to `order-events` and marks them published only after Kafka acknowledges them. This avoids losing events when the broker is temporarily unavailable; a crash after Kafka accepts a record but before the outbox update can cause a duplicate, so consumers should be idempotent. The `OrderEventListener` consumes events with the `order-service` group. Listener failures are retried with exponential backoff, then routed to `order-events-dlt` with the original payload and error headers.
+
+The Kafka broker address defaults to `localhost:9092` and can be changed with `KAFKA_BOOTSTRAP_SERVERS`. The local Compose broker uses a single partition and is intended for development.
 
 ## Endpoints
 

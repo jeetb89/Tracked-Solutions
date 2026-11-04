@@ -16,8 +16,8 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
-printf 'Starting PostgreSQL and Redis...\n'
-docker compose -f "$ROOT_DIR/compose.yaml" up -d --wait postgres redis
+printf 'Starting PostgreSQL, Redis, and Kafka...\n'
+docker compose -f "$ROOT_DIR/compose.yaml" up -d --wait postgres redis kafka
 
 printf 'Starting the Order Management Service at http://localhost:8080...\n'
 cd "$SERVICE_DIR"
@@ -27,4 +27,5 @@ exec env \
   SPRING_DATASOURCE_PASSWORD="${SPRING_DATASOURCE_PASSWORD:-${POSTGRES_PASSWORD:-localdev}}" \
   REDIS_HOST="${REDIS_HOST:-localhost}" \
   REDIS_PORT="${REDIS_PORT:-6379}" \
+  KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-localhost:${KAFKA_PORT:-9092}}" \
   mvn spring-boot:run
